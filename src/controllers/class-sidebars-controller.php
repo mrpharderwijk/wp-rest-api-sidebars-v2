@@ -40,35 +40,43 @@ use WP_Error;
  *
  * @package WP_API_Sidebars\Controllers
  */
-class Sidebars_Controller extends WP_REST_Controller {
+class Sidebars_Controller extends WP_REST_Controller
+{
     /**
      * Registers the controllers routes
      *
      * @return null
      */
-    public function register_routes() {
-        register_rest_route( 'wp-rest-api-sidebars/v2', '/sidebars', [
+    public function register_routes()
+    {
+        register_rest_route('wp-rest-api-sidebars/v2', '/sidebars', [
             [
                 'methods'             => WP_REST_Server::READABLE,
-                'callback'            => [ $this, 'get_items' ],
+                'callback'            => [$this, 'get_items'],
+                'permission_callback' => function () {
+                    return TRUE;
+                }
             ],
-        ] );
+        ]);
 
-        register_rest_route( 'wp-rest-api-sidebars/v2', '/sidebars/(?P<id>[\w-]+)', [
+        register_rest_route('wp-rest-api-sidebars/v2', '/sidebars/(?P<id>[\w-]+)', [
             [
                 'methods'             => WP_REST_Server::READABLE,
-                'callback'            => [ $this, 'get_item' ],
+                'callback'            => [$this, 'get_item'],
                 'args'                => [
                     'id' => [
                         'description' => 'The id of a registered sidebar',
                         'type' => 'string',
-                        'validate_callback' => function ( $sidebar_id ) {
-                            return ! is_null( self::get_sidebar( $sidebar_id ) );
+                        'validate_callback' => function ($sidebar_id) {
+                            return !is_null(self::get_sidebar($sidebar_id));
                         }
                     ],
                 ],
+                'permission_callback' => function () {
+                    return TRUE;
+                }
             ],
-        ] );
+        ]);
     }
 
     /**
@@ -78,21 +86,22 @@ class Sidebars_Controller extends WP_REST_Controller {
      *
      * @return WP_REST_Response
      */
-    public function get_items( $request ) {
+    public function get_items($request)
+    {
         // do type checking here as the method declaration must be compatible with parent
-        if ( ! $request instanceof WP_REST_Request ) {
-            throw new InvalidArgumentException( __METHOD__ . ' expects an instance of WP_REST_Request' );
+        if (!$request instanceof WP_REST_Request) {
+            throw new InvalidArgumentException(__METHOD__ . ' expects an instance of WP_REST_Request');
         }
 
         global $wp_registered_sidebars;
 
         $sidebars = [];
 
-        foreach ( (array) $wp_registered_sidebars as $slug => $sidebar ) {
+        foreach ((array) $wp_registered_sidebars as $slug => $sidebar) {
             $sidebars[] = $sidebar;
         }
 
-        return new WP_REST_Response( $sidebars, 200 );
+        return new WP_REST_Response($sidebars, 200);
     }
 
     /**
@@ -102,22 +111,23 @@ class Sidebars_Controller extends WP_REST_Controller {
      *
      * @return WP_REST_Response
      */
-    public function get_item( $request ) {
+    public function get_item($request)
+    {
         // do type checking here as the method declaration must be compatible with parent
-        if ( ! $request instanceof WP_REST_Request ) {
-            throw new InvalidArgumentException( __METHOD__ . ' expects an instance of WP_REST_Request' );
+        if (!$request instanceof WP_REST_Request) {
+            throw new InvalidArgumentException(__METHOD__ . ' expects an instance of WP_REST_Request');
         }
 
-        $sidebar = $this->get_sidebar( $request->get_param( 'id' ) );
+        $sidebar = $this->get_sidebar($request->get_param('id'));
 
         ob_start();
 
-        dynamic_sidebar( $request->get_param( 'id' ) );
+        dynamic_sidebar($request->get_param('id'));
 
         $sidebar['rendered'] = ob_get_clean();
-        $sidebar['widgets'] = self::get_widgets( $sidebar['id'] );
+        $sidebar['widgets'] = self::get_widgets($sidebar['id']);
 
-        return new WP_REST_Response( $sidebar, 200 );
+        return new WP_REST_Response($sidebar, 200);
     }
 
     /**
@@ -129,23 +139,24 @@ class Sidebars_Controller extends WP_REST_Controller {
      *
      * @return array|null
      */
-    public static function get_sidebar( $id ) {
+    public static function get_sidebar($id)
+    {
         global $wp_registered_sidebars;
 
-        if ( is_int( $id ) ) {
+        if (is_int($id)) {
             $id = 'sidebar-' . $id;
         } else {
-            $id = sanitize_title( $id );
+            $id = sanitize_title($id);
 
-            foreach ( (array) $wp_registered_sidebars as $key => $sidebar ) {
-                if ( sanitize_title( $sidebar['name'] ) == $id ) {
+            foreach ((array) $wp_registered_sidebars as $key => $sidebar) {
+                if (sanitize_title($sidebar['name']) == $id) {
                     return $sidebar;
                 }
             }
         }
 
-        foreach ( (array) $wp_registered_sidebars as $key => $sidebar ) {
-            if ( $key === $id ) {
+        foreach ((array) $wp_registered_sidebars as $key => $sidebar) {
+            if ($key === $id) {
                 return $sidebar;
             }
         }
@@ -163,50 +174,51 @@ class Sidebars_Controller extends WP_REST_Controller {
      *
      * @return array
      */
-    public static function get_widgets( $sidebar_id ) {
+    public static function get_widgets($sidebar_id)
+    {
         global $wp_registered_widgets, $wp_registered_sidebars;
 
         $widgets = [];
         $sidebars_widgets = wp_get_sidebars_widgets();
 
-        if ( isset( $wp_registered_sidebars[ $sidebar_id ] ) && isset( $sidebars_widgets[ $sidebar_id ] ) ) {
-            foreach ( (array) $sidebars_widgets[ $sidebar_id ] as $widget_id ) {
+        if (isset($wp_registered_sidebars[$sidebar_id]) && isset($sidebars_widgets[$sidebar_id])) {
+            foreach ((array) $sidebars_widgets[$sidebar_id] as $widget_id) {
                 // just to be sure
-                if ( isset( $wp_registered_widgets[ $widget_id ] ) ) {
-                    $widget = $wp_registered_widgets[ $widget_id ];
+                if (isset($wp_registered_widgets[$widget_id])) {
+                    $widget = $wp_registered_widgets[$widget_id];
 
                     // get the widget output
-                    if ( is_callable( $widget['callback'] ) ) {
+                    if (is_callable($widget['callback'])) {
                         // @note: everything up to ob_start is taken from the dynamic_sidebar function
                         $widget_parameters = array_merge(
                             [
-                                array_merge( $wp_registered_sidebars[ $sidebar_id ], [
+                                array_merge($wp_registered_sidebars[$sidebar_id], [
                                     'widget_id' => $widget_id,
                                     'widget_name' => $widget['name'],
-                                ] )
+                                ])
                             ],
                             (array) $widget['params']
                         );
 
                         $classname = '';
-                        foreach ( (array) $widget['classname'] as $cn ) {
-                            if ( is_string( $cn ) )
+                        foreach ((array) $widget['classname'] as $cn) {
+                            if (is_string($cn))
                                 $classname .= '_' . $cn;
-                            elseif ( is_object( $cn ) )
-                                $classname .= '_' . get_class( $cn );
+                            elseif (is_object($cn))
+                                $classname .= '_' . get_class($cn);
                         }
-                        $classname = ltrim( $classname, '_' );
-                        $widget_parameters[0]['before_widget'] = sprintf( $widget_parameters[0]['before_widget'], $widget_id, $classname );
+                        $classname = ltrim($classname, '_');
+                        $widget_parameters[0]['before_widget'] = sprintf($widget_parameters[0]['before_widget'], $widget_id, $classname);
 
                         ob_start();
 
-                        call_user_func_array( $widget['callback'], $widget_parameters );
+                        call_user_func_array($widget['callback'], $widget_parameters);
 
                         $widget['rendered'] = ob_get_clean();
                     }
 
-                    unset( $widget['callback'] );
-                    unset( $widget['params'] );
+                    unset($widget['callback']);
+                    unset($widget['params']);
 
                     $widgets[] = $widget;
                 }
@@ -216,4 +228,3 @@ class Sidebars_Controller extends WP_REST_Controller {
         return $widgets;
     }
 }
-
